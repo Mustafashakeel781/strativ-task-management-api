@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 
 from .database import Base, engine, get_db
-from .models import User
+from .models import User, Task
 from .auth import hash_password, verify_password
 
 app = FastAPI(title="Strativ Task Management API")
@@ -70,8 +70,66 @@ def login(user: UserCreate, db: Session = Depends(get_db)):
             status_code=401,
             detail="Invalid email or password"
         )
+       ## Task list
+@app.get("/tasks")
+def get_tasks(db: Session = Depends(get_db)):
+    return db.query(Task).all()
 
     return {
         "message": "Login successful",
         "user_id": existing_user.id
+    }
+    ## Task update
+
+@app.patch("/tasks/{task_id}")
+def update_task(
+    task_id: int,
+    task: TaskUpdate,
+    db: Session = Depends(get_db)
+):
+    existing_task = db.query(Task).filter(
+        Task.id == task_id
+    ).first()
+
+    if not existing_task:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found"
+        )
+
+    if task.title is not None:
+        existing_task.title = task.title
+
+    if task.description is not None:
+        existing_task.description = task.description
+
+    if task.status is not None:
+        existing_task.status = task.status
+
+    db.commit()
+    db.refresh(existing_task)
+
+    return existing_task
+
+## Task delete
+@app.delete("/tasks/{task_id}")
+def delete_task(
+    task_id: int,
+    db: Session = Depends(get_db)
+):
+    existing_task = db.query(Task).filter(
+        Task.id == task_id
+    ).first()
+
+    if not existing_task:
+        raise HTTPException(
+            status_code=404,
+            detail="Task not found"
+        )
+
+    db.delete(existing_task)
+    db.commit()
+
+    return {
+        "message": "Task deleted successfully"
     }
